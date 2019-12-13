@@ -93,6 +93,70 @@ namespace DepartmentEmployees.API.Controllers
                 }
             }
         }
+        [HttpGet]
+        [Route("GetDepartmentWithEmployees")]
+        public async Task<IActionResult> GetDepartmentWithEmployees()
+        {
+            using (SqlConnection conn = Connection)
+            {
+                conn.Open();
+                using (SqlCommand cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"SELECT d.Id, d.DeptName, e.FirstName, e.LastName, e.DepartmentId, e.Id as EmployeeId
+                                        FROM Department d
+                                        LEFT JOIN Employee e ON d.Id = e.DepartmentId";
+                    SqlDataReader reader = cmd.ExecuteReader();
+                    List<Department> departments = new List<Department>();
+                    while (reader.Read())
+                    {
+                        var departmentId = reader.GetInt32(reader.GetOrdinal("Id"));
+                        var departmentAlreadyAdded = departments.FirstOrDefault(d => d.Id == departmentId);
+
+                        if (departmentAlreadyAdded == null)
+                        {
+                            Department department = new Department
+                            {
+                                Id = departmentId,
+                                DeptName = reader.GetString(reader.GetOrdinal("DeptName")),
+                                Employees = new List<Employee>()
+                            };
+                            departments.Add(department);
+
+                            var hasEmployee = !reader.IsDBNull(reader.GetOrdinal("EmployeeId"));
+
+                            if (hasEmployee)
+                            {
+                                department.Employees.Add(new Employee()
+                                {
+                                    FirstName = reader.GetString(reader.GetOrdinal("FirstName")),
+                                    LastName = reader.GetString(reader.GetOrdinal("LastName")),
+                                    DepartmentId = reader.GetInt32(reader.GetOrdinal("Id")),
+                                    Id = reader.GetInt32(reader.GetOrdinal("EmployeeId"))
+                                });
+                            }
+                        }
+                        else
+                        {
+                            var hasEmployee = !reader.IsDBNull(reader.GetOrdinal("EmployeeId"));
+
+                            if (hasEmployee)
+                            {
+                                departmentAlreadyAdded.Employees.Add(new Employee()
+                                {
+                                    FirstName = reader.GetString(reader.GetOrdinal("FirstName")),
+                                    LastName = reader.GetString(reader.GetOrdinal("LastName")),
+                                    DepartmentId = reader.GetInt32(reader.GetOrdinal("Id")),
+                                    Id = reader.GetInt32(reader.GetOrdinal("EmployeeId"))
+                                });
+                            }
+                        }
+                    }
+                    reader.Close();
+                    return Ok(departments);
+                }
+            }
+        }
+    
 
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] Department department)
